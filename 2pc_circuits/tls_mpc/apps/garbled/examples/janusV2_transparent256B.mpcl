@@ -7,6 +7,20 @@ import (
 	"crypto/hmac"
 )
 
+// python console, to generate 2kB
+// a = "01010101010101010101010101010101" // 16
+// b = ""
+// >>> for i in range(128): // 16*2=32, 16*4=64, 16*8=128, 16*16=256, 16*32=512, 16*64=1024, 16*128=2048
+// ...     b += a
+// ...
+// >>> print(b)
+
+// 16B: a = "0x01010101010101010101010101010101"
+// 32B: a = "0x0101010101010101010101010101010101010101010101010101010101010101"
+// 64B: a = "0x01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+// 128B: a = "0x0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+// 256B: a = "0x01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+
 // sample values for request computation
 // Tests to derive CHTS:
 // dES: 0x6f2615a108c702c5678f54fc9dbab69716c076189c48250cebeac3576c3611ba
@@ -78,35 +92,25 @@ import (
 
 // secret mask (16 bytes): 0x4647eb76ffd794580046acf096d6b7a2
 
-// MPCLDIR=./../../ ./garbled -v -i 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff,0xfbe470a4a1e11bbaa2ebb9da082924f99a20681e5feed0000e2d2b5e613d22df,0x6f2615a108c702c5678f54fc9dbab69716c076189c48250cebeac3576c3611ba,0x7691bca4c1a92ffc70efe68a178d928540f47254512c290693fbc2a8c28ab59c,0x9b89f7120fe41972a4e81f2e63453807,0x895b8c63da8da17e9d6d30c62f09d6f5,0xf8895999038a3cb1169a882ebba33ca5,0xf0cecf8cdd4452c1f77a297cff13a605,0x51f870d025adaf98478f28d6abd81ca7,0x45123ceef731619582d1570c31a38724,0x4647eb76ffd794580046acf096d6b7a2,0x2222115555532db2e3bd2a8a examples/tls13_hvzk_total_v2.mpcl
+// MPCLDIR=./../../ ./garbled -v -i 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff,0xfbe470a4a1e11bbaa2ebb9da082924f99a20681e5feed0000e2d2b5e613d22df,0x6f2615a108c702c5678f54fc9dbab69716c076189c48250cebeac3576c3611ba,0x01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101 examples/janusV2_transparent256B.mpcl
 type Garbler struct {
-	modP        uint512
-	privShare   uint512
-	dES         [32]byte
-	SHTS        [32]byte
-	ECB0        [32]byte
-	ECB1        [32]byte
-	cECB0       [32]byte
-	cECB1       [32]byte
-	Parity      [16]byte
-	ParityC     [16]byte
-	parityKey   [16]byte
-	parityNonce [12]byte
+	modP           uint512
+	privShare      uint512
+	dES            [32]byte
+	plainChunkResp [256]byte
 }
 
-// MPCLDIR=./../../ ./garbled -e -v -i 0x677f7ff26ac202469e1a2d39dc001c5e7fcfb1f967a3cb4affa51185facc57ac,0x002012746c7331332073206873207472616666696320825e4f79bbcb0e8adb287cac19c378145b7d6c465734422da6882463eadc905701,0x00200d746c733133206465726976656420e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85501,0x002012746c7331332073206170207472616666696320803fe80818374bc995571054979e54a316f266b4908ed43f5df4752bdef093b801,0x002012746c7331332063206170207472616666696320803fe80818374bc995571054979e54a316f266b4908ed43f5df4752bdef093b801,0x000c08746c7331332069760001,0x001009746c733133206b65790001 examples/tls13_hvzk_total_v2.mpcl
+// MPCLDIR=./../../ ./garbled -e -v -i 0x677f7ff26ac202469e1a2d39dc001c5e7fcfb1f967a3cb4affa51185facc57ac,0x002012746c7331332073206873207472616666696320825e4f79bbcb0e8adb287cac19c378145b7d6c465734422da6882463eadc905701,0x00200d746c733133206465726976656420e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85501,0x002012746c7331332073206170207472616666696320803fe80818374bc995571054979e54a316f266b4908ed43f5df4752bdef093b801,0x000c08746c7331332069760001,0x001009746c733133206b65790001 examples/janusV2_transparent256B.mpcl
 type Evaluator struct {
-	// privShare [32]byte
 	privShare uint512
 	hTwo      [55]byte
 	hZero     [50]byte
 	hThree    [55]byte
-	hThreeC   [55]byte
 	ivLabel   [13]byte
 	keyLabel  [14]byte
 }
 
-func main(g Garbler, e Evaluator) uint8 { // uint8
+func main(g Garbler, e Evaluator) ([]byte, []byte, []byte, []byte) { // uint8, ([]byte, []byte), []byte
 
 	// combine secret shares into DHE
 	DHE := (g.privShare + e.privShare) % g.modP
@@ -123,13 +127,6 @@ func main(g Garbler, e Evaluator) uint8 { // uint8
 	}
 	SHTS := hmac.SumSHA256(mH2[:], HS)
 
-	// check SHTS against public input
-	for i := 0; i < 32; i++ {
-		if (SHTS[i] ^ g.SHTS[i]) != 0x00 {
-			return 0x00
-		}
-	}
-
 	// compute dHS
 	var mH0 [50]byte
 	mH0[0] = 0x00
@@ -142,21 +139,12 @@ func main(g Garbler, e Evaluator) uint8 { // uint8
 	var zeros32 [32]byte
 	MS := hmac.SumSHA256(zeros32[:], dHS)
 
-	// compute CATS
-	var mH3c [55]byte
-	mH3c[0] = 0x00
-	for i := 1; i < 55; i++ {
-		mH3c[i] = e.hThreeC[i-1]
-	}
-	CATS := hmac.SumSHA256(mH3c[:], MS)
-
 	// compute iv (to be disclosed in plain)
 	var mIv [13]byte
 	mIv[0] = 0x00
 	for i := 1; i < 13; i++ {
 		mIv[i] = e.ivLabel[i-1]
 	}
-	civ := hmac.SumSHA256(mIv[:], CATS)[:12]
 
 	// compute client traffic key
 	var mKey [14]byte
@@ -164,7 +152,6 @@ func main(g Garbler, e Evaluator) uint8 { // uint8
 	for i := 1; i < 14; i++ {
 		mKey[i] = e.keyLabel[i-1]
 	}
-	ckey := hmac.SumSHA256(mKey[:], CATS)[:16]
 
 	// compute SATS
 	var mH3 [55]byte
@@ -180,22 +167,6 @@ func main(g Garbler, e Evaluator) uint8 { // uint8
 	// compute server traffic key
 	key := hmac.SumSHA256(mKey[:], SATS)[:16]
 
-	// compute request ecbs (check input correctness)
-	var czeros16 [16]byte
-	cECBK := aes.Block128(ckey, czeros16)
-	cnonce := getNonce(civ, 1)
-	cECB1 := aes.Block128(ckey, cnonce)
-
-	// match ecb0, ecb1 against public input
-	for i := 0; i < 16; i++ {
-		if (cECB1[i] ^ g.cECB1[i]) != 0x00 {
-			return 0x00
-		}
-		if (cECBK[i] ^ g.cECB0[i]) != 0x00 {
-			return 0x00
-		}
-	}
-
 	// compute response ecbs
 	var zeros16 [16]byte
 	ECBK := aes.Block128(key, zeros16)
@@ -205,83 +176,21 @@ func main(g Garbler, e Evaluator) uint8 { // uint8
 	counter = memcpy(counter, 0, iv, 0)
 	counter = incr(counter)
 
-	// match ecb0, ecb1 against public input
-	for i := 0; i < 16; i++ {
-		if (ECB1[i] ^ g.ECB1[i]) != 0x00 {
-			return 0x00
-		}
-		if (ECBK[i] ^ g.ECB0[i]) != 0x00 {
-			return 0x00
-		}
-	}
-
-	// server side request ecb verification
+	// server side response ecb verification
 	var block [aes.BlockSize]byte
-	numberECBs := (1000 * 16)
-	// var ecbVector [numberECBs]byte
-	var parityChecksum [aes.BlockSize]byte
+	numberChunks := (16 * 16)
+	var ecbs [numberChunks]byte
 
-	var responseMask_i [aes.BlockSize]byte
-	var maskCounter [aes.BlockSize]byte
-	maskCounter = memcpy(maskCounter, 0, g.parityNonce[:], 0)
-	maskCounter = incr(maskCounter)
-
-	for i := 0; i < numberECBs; i += aes.BlockSize {
+	// loop increments with 16 step size
+	for i := 0; i < numberChunks; i += aes.BlockSize {
 		counter = incr(counter)
-		maskCounter = incr(maskCounter)
-
 		block = aes.Block128(key, counter)
-		responseMask_i = aes.Block128(g.parityKey, maskCounter)
-
 		for j := 0; j < aes.BlockSize; j++ {
-			// add parity masks here
-			parityChecksum[j] = parityChecksum[j] ^ (block[j] & responseMask_i[j])
+			ecbs[i+j] = block[j]
 		}
 	}
 
-	// compare parity checksum
-	// return parityChecksum
-	for i := 0; i < 16; i++ {
-		if (parityChecksum[i] ^ g.Parity[i]) != 0 {
-			return 0x00
-		}
-	}
-
-	// client request parity check, no need to verify SHTS twice and must not check ecb0,ecb1
-	var block2 [aes.BlockSize]byte
-	numberECBs2 := (16 * 16)
-	// var ecbVector [numberECBs]byte
-	var parityChecksum2 [aes.BlockSize]byte
-
-	var requestMask_i [aes.BlockSize]byte
-
-	var counter2 [aes.BlockSize]byte
-	counter2 = memcpy(counter2, 0, civ, 0)
-	counter2 = incr(counter2)
-	for i := 0; i < numberECBs2; i += aes.BlockSize {
-		counter2 = incr(counter2)
-		maskCounter = incr(maskCounter)
-
-		block2 = aes.Block128(ckey, counter2)
-		requestMask_i = aes.Block128(g.parityKey, maskCounter)
-
-		// add parity checksum according to formula
-		for j := 0; j < aes.BlockSize; j++ {
-			parityChecksum2[j] = parityChecksum2[j] ^ (block2[j] & requestMask_i[j])
-		}
-	}
-
-	// compare parity checksum
-	// return parityChecksum2
-	for i := 0; i < 16; i++ {
-		if (parityChecksum2[i] ^ g.ParityC[i]) != 0 {
-			return 0x00
-		}
-	}
-
-	// var temp [1]byte
-	// temp[0] = 0x01
-	return 0x01
+	return SHTS[:], ECBK[:], ECB1[:], ecbs[:]
 }
 
 func byteToUint128(x [16]byte) uint128 {
